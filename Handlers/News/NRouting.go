@@ -1,8 +1,8 @@
 package News
 
 import (
-	"database/sql"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"net/http"
 	"newsService1/Database"
 )
@@ -38,29 +38,17 @@ func GetNewsByID(c *gin.Context) {
 }
 
 func fetchNewsByCategoryID(categoryID string) ([]News, error) {
-	rows, err := Database.DB.Query("SELECT id, title, description, categoryid , NDate ,full_description FROM news WHERE categoryid = $1", categoryID)
-	if err != nil {
+	var news []News
+	if err := Database.DB.Where("categoryid = ?", categoryID).Find(&news).Error; err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var news []News
-	for rows.Next() {
-		var item News
-		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.CategoryID, &item.NDate, &item.FullDescription); err != nil {
-			return nil, err
-		}
-		news = append(news, item)
-	}
-
 	return news, nil
 }
 
 func fetchNewsByID(newsID string) (*News, error) {
-	row := Database.DB.QueryRow("SELECT id, title, description, categoryid, NDate ,full_description FROM news WHERE id = $1", newsID)
 	var item News
-	if err := row.Scan(&item.ID, &item.Title, &item.Description, &item.CategoryID, &item.NDate, &item.FullDescription); err != nil {
-		if err == sql.ErrNoRows {
+	if err := Database.DB.First(&item, "id = ?", newsID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, err

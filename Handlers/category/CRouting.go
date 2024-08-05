@@ -1,8 +1,8 @@
 package category
 
 import (
-	"database/sql"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"log"
 	"net/http"
 	"newsService1/Database"
@@ -11,6 +11,7 @@ import (
 
 func RegisterRoutes(router *gin.Engine) {
 	router.GET("/categories", GetCategories)
+	router.GET("/categories/:id", GetCategoryByID)
 }
 
 func GetCategories(c *gin.Context) {
@@ -33,7 +34,7 @@ func GetCategoryByID(c *gin.Context) {
 
 	category, err := fetchCategoryByID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -45,30 +46,21 @@ func GetCategoryByID(c *gin.Context) {
 }
 
 func fetchCategories() ([]Category, error) {
-	rows, err := Database.DB.Query("SELECT id, name FROM categories")
-	if err != nil {
-		log.Println("Error executing query:", err)
+	var categories []Category
+	if err := Database.DB.Find(&categories).Error; err != nil {
+		log.Println("Error fetching categories:", err)
 		return nil, err
 	}
-	defer rows.Close()
-
-	categories := []Category{}
-	for rows.Next() {
-		var category Category
-		if err := rows.Scan(&category.ID, &category.Name); err != nil {
-			log.Println("Error scanning row:", err)
-			return nil, err
-		}
-		categories = append(categories, category)
-	}
-
 	return categories, nil
 }
+
 func fetchCategoryByID(id int) (Category, error) {
 	var category Category
-	row := Database.DB.QueryRow("SELECT id, name FROM categories WHERE id = $1", id)
-	err := row.Scan(&category.ID, &category.Name)
-	if err != nil {
+	if err := Database.DB.First(&category, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return category, nil
+		}
+		log.Println("Error fetching category by ID:", err)
 		return category, err
 	}
 	return category, nil
